@@ -51,14 +51,29 @@ export const getProductSalesDemand = async (_: Request, res: Response) => {
       },
     });
 
+    const productPurchases = await prisma.purchaseProduct.groupBy({
+      by: ["productId"],
+      _sum: {
+        quantity: true,
+      },
+    });
+
+    const purchaseMap = productPurchases.reduce((map, purchase) => {
+      map[purchase.productId] = purchase._sum.quantity || 0;
+      return map;
+    }, {} as Record<number, number>);
+
     const detailedSales = await Promise.all(
       productSales.map(async (sale) => {
         const product = await prisma.product.findUnique({
           where: { id: sale.productId },
         });
+        const purchasedQuantity = purchaseMap[sale.productId] || 0;
+
         return {
           product: product,
           totalQuantitySold: sale._sum.quantity || 0,
+          totalQuantityMissing: (sale._sum.quantity || 0) - purchasedQuantity,
           totalSales: sale._count.productId || 0,
         };
       })
