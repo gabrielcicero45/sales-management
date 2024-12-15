@@ -5,6 +5,28 @@ export const createPurchase = async (req: Request, res: Response) => {
   const { saleId, products } = req.body;
 
   try {
+    const saleProducts = await prisma.saleProduct.findMany({
+      where: {
+        saleId,
+        productId: {
+          in: products.map((p: { productId: number }) => p.productId),
+        },
+      },
+    });
+
+    const validProductIds = saleProducts.map(
+      (sp: { productId: number }) => sp.productId
+    );
+    const invalidProducts = products.filter(
+      (p: { productId: number }) => !validProductIds.includes(p.productId)
+    );
+
+    if (invalidProducts.length > 0) {
+      return res.status(400).json({
+        error: "Alguns produtos não estão associados à venda especificada.",
+        invalidProducts: saleProducts,
+      });
+    }
     const purchase = await prisma.purchase.create({
       data: {
         saleId,
